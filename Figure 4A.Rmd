@@ -1,0 +1,182 @@
+---
+title: "Generic Ion Leakage"
+author: "Marijn Knip"
+date: "23 november 2017"
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+rm(list=ls())
+library(knitr)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Simple Line graph for Ion Leakage experiments
+
+This script generates simple line graphs for data generated in an ion-leakage experiment using leaf discs.
+This script reads *.csv files in long format located in the same folder as the script file.
+In this section different elements in the output figure can be set.
+
+```{r, echo=off}
+## install libraries below, if needed
+## install.packages("ggplot2")
+## install.packages("doBy")
+library(ggplot2)
+library(doBy)
+library(ggpubr)
+library(tidyr)
+
+  iondata <- read.table("data - Figure 4A.csv", ##change to your *.csv
+                     header = T,
+                     sep = ";",
+                     dec = "."
+)
+
+##insert plot title, axis titles, legend text etc. here
+plottitle=    ""
+plotsubtitle= ""
+legendtitle=  "Constructs"
+xaxislabel=   "Time after DEX-induction (hrs)"
+yaxislabel=   "Conductivity (\U03BCS/m)"
+legendname1=  "DEX::CP105"
+legendname2=  "DEX::CP106"
+
+
+##summarizing data
+iondata$Leaf <- NULL
+iondata$Timepoint <-as.factor(iondata$Timepoint)
+
+iondata$Construct <- as.character(iondata$Construct)
+iondata$Construct[iondata$Construct == "CP105"] <- "DEX::CP105"
+iondata$Construct[iondata$Construct == "CP106"] <- "DEX::CP106"
+
+iondata$Construct <- as.factor(iondata$Construct)
+
+data <- summaryBy(Conductivity ~ Timepoint + Construct, data=iondata, FUN=c(length,mean,sd))
+
+
+
+summary(data)
+
+```
+
+## Building the plot
+In the section below is the code to generate the simple plot:
+
+```{r echo=off}
+## drawing plot > Mean values incl. stdev.
+#  line graph with dots, slightly transparent (alpha)
+#  set position dodge to move data pounts slightly
+## Using scale_colour_manual (matching brewer "spectral" colour), as using only two colors brewer with spectral palette doesn't give red/blue 
+pd <- position_dodge(0.00)
+
+p1 <- ggplot(data, aes(x=Timepoint, y=Conductivity.mean, color=Construct, group=Construct)) + 
+        geom_point(aes(shape=Construct),
+                   size=3, 
+                   alpha = 0.4, 
+                   position = pd)+
+        geom_line()+
+        scale_color_manual(values = c("#2b83ba","#d7191c"))
+        
+plot(p1)
+```
+```{r, echo=off}
+
+p2 <- p1 + geom_errorbar(data=data, 
+                         aes(ymin=Conductivity.mean-Conductivity.sd,ymax=Conductivity.mean+Conductivity.sd), 
+                         width=0.2, 
+                         position=pd,
+                         alpha=0.4) +
+           stat_compare_means(data=iondata, 
+                        aes(x=Timepoint, y=Conductivity),
+                        method="wilcox.test",
+                        label = "p.signif", 
+                        label.y=c(35,40,55,90,145),
+                        show.legend=FALSE)
+p2 
+ 
+```
+
+## Plot design
+Now the plot is generated we improve the design:
+
+
+```{r}
+#enhancing plot design
+#setting labels and titles
+p3 <- p2 + labs(x=xaxislabel, 
+                y=yaxislabel,
+                color=legendtitle,
+                shape=legendtitle,
+                title=plottitle,
+                subtitle=plotsubtitle
+               ) +
+          scale_y_continuous(limits=c(0, 150),
+                             breaks=seq(0,150,25),
+                             expand = c(0, 0))
+               
+#changing Theme
+p4 <- p3 +theme(
+  plot.title = element_text(hjust = 0.5 , color="black", size=24, face="bold"),
+  plot.subtitle = element_text(hjust = 0.5 , color="black", size=16, face="italic"),
+  axis.title.x = element_text(color="black", size=14, face="plain"),
+  axis.title.y = element_text(color="black", size=14, face="plain"),
+  panel.background = element_rect(fill = "white",
+                                  colour = "white",
+                                  size = 0.5, linetype = "solid"),
+  panel.grid.major = element_line(size = 0.5, linetype = 'solid',
+                                  colour = "#f9f9f9"), 
+  panel.grid.minor = element_blank(),
+  panel.border = element_rect(colour = "black", fill=NA, size=1),
+  text = element_text(size=14, face = "plain"), 
+  legend.key = element_blank(),  ## Get rid of the legend box 
+  legend.title = element_text(size = 14, face="bold"),
+  legend.text = element_text(size = 14, face="italic"),
+  legend.position="bottom",
+  legend.background = element_rect(fill=alpha(0.0001))
+)
+plot(p4)
+```
+
+```{r}
+#enhancing plot design
+#setting labels and titles
+p3 <- p2 + scale_y_continuous(limits=c(0, 150),
+                             breaks=seq(0,150,25),
+                             expand = c(0, 0))
+               
+#changing Theme
+p4 <- p3 +theme(
+  plot.title = element_text(hjust = 0.5 , color="black", size=24, face="bold"),
+  plot.subtitle = element_text(hjust = 0.5 , color="black", size=16, face="italic"),
+  axis.title.x = element_blank(),
+  axis.title.y = element_blank(),
+  panel.background = element_rect(fill = "white",
+                                  colour = "white",
+                                  size = 0.5, linetype = "solid"),
+  panel.grid.major = element_line(size = 0.5, linetype = 'solid',
+                                  colour = "#f9f9f9"), 
+  panel.grid.minor = element_blank(),
+  panel.border = element_rect(colour = "black", fill=NA, size=1),
+  text = element_text(size=14, face = "plain"), 
+  legend.key = element_blank(),  ## Get rid of the legend box 
+  legend.title = element_blank(),
+  legend.text = element_blank(),
+  legend.position="bottom",
+  legend.background = element_rect(fill=alpha(0.0001))
+)
+plot(p4)
+```
+```{r}
+
+# save to file
+ggsave(filename = "Ion-leakage-line-narrow-notitle.pdf",plot = p4,width = 8,height = 6,dpi = 600)
+ggsave(filename = "Ion-leakage-line-narrow-notitle-new.svg",plot = p4,width = 8,height = 6,dpi = 600)
+##if you want a PDF
+##ggsave(filename = "ROSburstBox.pdf",plot = p3,width = 12,height = 6,dpi = 600) 
+
+```

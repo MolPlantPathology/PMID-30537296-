@@ -1,0 +1,132 @@
+---
+title: "ROS burst line graph with facets"
+author: "Marijn Knip"
+date: "2/6/2018"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE)
+
+rm(list=ls())
+
+## install libraries below, if needed
+
+## install.packages("ggplot2")
+## install.packages("rstudioapi")
+## install.packages("tidyr")
+## install.packages("doBy")
+## install.packages("dplyr")
+##install.packages("gridExtra")
+
+library(ggplot2)
+##library(rstudioapi)
+library(tidyr)
+library(doBy)
+##library(dplyr)
+##library(gridExtra)
+
+```
+
+## First, data will be read from the directory where this file is located and wide-format csv will be converted to longformat.
+Because I'm an idiot, i've manually inserted columns in the data that guide the faceting and X-axis. This should be automated as soon as i know more R.
+
+```{r}
+##set working directory to location of this .R file and read datafile
+## This isn't necessary and doesn't work with Knit
+##setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+            widedata <- read.table("data - Figure S1.csv", ##change to your *.csv
+                   header = T,
+                   sep = ";",
+                   dec = "."
+)
+
+        
+## convert data from wide to long format
+
+        longdata <- gather(widedata,Timename,Measurement, Sample1:Sample10,factor_key=TRUE)
+        longdata$Timename <- NULL
+        filterlongdata <- longdata %>% drop_na()
+        
+## summarizing data
+data <- summaryBy(.~Time+Construct, data=filterlongdata, FUN=c(length,mean,sd))
+
+legendname1=  "Mock treatment"
+legendname2=  "Flg22"
+
+```
+
+## Including Plots
+
+Here's the basic plot that's being generated. Not how i'm using  stat_smooth instead of geom_line. Fits a polynomial on the points; looks nice.
+
+```{r, echo=FALSE}
+
+##drawing plot > Mean values incl. stdev.
+#line graph with dots, slightly transparent (alpha)
+# set position dodge to move data pounts slightly
+p1 <- ggplot(data, aes(x=Time, y=Measurement.mean, color=Construct)) + 
+    stat_smooth(aes(x = Time, y = Measurement.mean), method = "gam",
+              formula = y ~ s(x, k = 12), se = FALSE)+
+    geom_point(size=2, alpha = 0.5, position = position_dodge(0.05))+
+  ##Blue/red--Purple,Blues,Greens::
+    scale_color_manual(labels = c(legendname1,legendname2),
+                       values=c("#2b83ba","#d7191c"))+
+    geom_errorbar(aes(ymin=Measurement.mean-Measurement.sd, ymax=Measurement.mean+Measurement.sd), width=0.2, alpha = 0.6)
+p1
+```
+
+## Adding labels and facetting
+The plot from this data contains three facets.
+
+```{r}
+
+
+##Changing the labels
+p2 <-  p1 + labs(title = "", subtitle = "", color="Constructs") + 
+            ylab("Luminescence(AU)") 
+p2
+
+```
+
+## Formatting the rest of the plot
+Set font sizes, rotation, spacing of facets, legend, line thickness etc...
+
+```{r}
+p3 <- p2 +        theme(axis.text = element_text(size = 14),
+                  panel.spacing = unit(1.5, "lines"),
+                  legend.key = element_rect(fill = "white", colour = "black"),
+                  legend.text = element_text(size = 14, angle = 0, colour = "Black"),
+                  legend.title = element_text(face = "bold", size = 14, angle = 0, colour = "Black"),
+                  legend.background = element_rect(fill = "white"),
+                  legend.position = "bottom",
+                  legend.key.size = unit(1.5, 'lines'),
+                  panel.grid.major = element_line(colour = "grey96"),
+                  panel.grid.minor = element_blank(),
+                  panel.background = element_rect(fill = "white"), 
+                  panel.border = element_rect(colour = "black",fill=NA, size=1),
+                  plot.title = element_text(hjust=0.5, face = "bold", size = 20, angle = 0, colour = "Black"),
+                  plot.subtitle = element_text(hjust=0.5, face = "italic", size = 14, angle = 0, colour = "Black"),
+                  axis.title = element_text(size = 14, angle = 0, colour = "Black"),
+                  axis.text.x = element_text(size = 14, angle = 0, colour = "grey20", hjust=0.5, vjust=0.8),
+                  strip.text = element_text(size = 14, angle = 0, colour = "Black"))+
+                  scale_x_continuous("Time",breaks= c(0,3,6,9,12),
+                                labels = c("00:00", "07:30", "18:30","29:30", "40:30"))
+p3
+```
+
+## Output your plot
+Generate files from the plot you made.
+
+```{r}
+
+# save to file
+ggsave(filename = "ROSburst-line-notitle.png",plot = p3,width = 8,height = 6,dpi = 600)
+
+##if you want a PDF
+##ggsave(filename = "ROSburstBox.pdf",plot = p3,width = 12,height = 6,dpi = 600) 
+
+```
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

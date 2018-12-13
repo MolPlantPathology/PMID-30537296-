@@ -1,0 +1,117 @@
+---
+title: "boxplot"
+author: "Marijn Knip"
+date: "2/7/2018"
+output: html_document
+---
+
+Loading data and packages
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list=ls())
+
+library(ggplot2)
+## library(rstudioapi)
+library(ggsignif)
+library(ggpubr)
+library(doBy)
+
+## setwd(dirname(rstudioapi::getActiveDocumentContext()$path)) not working/necessary for r-markdown
+
+df = read.csv(file.path("data - Figure 5.csv"),
+              header=T,
+              sep=";",
+              stringsAsFactors=FALSE,
+              dec = ",",
+              colClasses = c("character","character","numeric","character", "character"))
+data <- summaryBy(Autofluorescence ~ Time + Construct+Experiment, data=df, FUN=c(length,mean,sd))
+```
+
+Filtering and formating data.
+Left piece in from earlier statistics, but it's inactivated (Apply Kruskal statistical test on both AN and NN data.)
+Paragraph to set titles and labels.
+Function to extract quartiles and means for plotting.
+
+```{r, echo=FALSE}
+
+#names and titles
+legendname1 = "Rx1 + DEX::CP105"
+legendname2 = "Rx1 + DEX::CP106"
+plottitle = ""
+plotsubtitle = ""
+yaxislabel = "Fluorescence ratio"
+xaxislabel = "Time after DEX-induction (hrs)"
+
+facetnames <- c("1" = "430nm/530nm", 
+                "2" = "480nm/690nm")
+
+```
+
+
+
+```{r, echo=FALSE}
+
+## PLOTTING PART
+p1 <- ggplot(df, aes(x=Time, y=Autofluorescence,fill=Construct))+
+       geom_boxplot(
+              position=position_dodge(width = 0.85),
+              colour = "black",
+              outlier.size=1,
+              outlier.color = "grey20",
+              outlier.shape="o")+
+      scale_fill_manual(
+                        values=c("#2b83ba","#d7191c"),
+                        labels = c(legendname1,legendname2))+
+      facet_grid(. ~ Experiment, labeller = as_labeller(facetnames))+
+      labs(
+          title =plottitle, 
+      #    subtitle=plotsubtitle,
+          y=yaxislabel,
+          x=xaxislabel,
+          fill="Constructs")
+p1 
+
+```
+
+```{r, echo=FALSE}
+
+##plotting mean (and quantile) and statistics
+p2 <- p1 + stat_summary(data = df,
+                        fun.y = mean, 
+                        geom = "point", 
+                        shape = 20,
+                        size = 1, 
+                        color = "black", 
+                        position = position_dodge(0.85)) + 
+          stat_compare_means(
+                        data = df, 
+                        method="wilcox.test", 
+                        size=3,
+                        label.y=0.1,
+                        label.sep = ", ",
+                        label="p.signif")
+p2
+```
+
+```{r, echo=FALSE}
+##Setting a theme
+p3 <- p2 +  theme(axis.text = element_text(size = 14, face="bold"),
+          plot.title = element_text(face = "bold", size = 14, angle = 0, colour = "Black", hjust=0.5),
+          plot.subtitle = element_text(face = "italic", size = 14, angle = 0, colour = "Black", hjust=0.5),
+          axis.title = element_text(size = 14, angle = 0, colour = "Black"),
+          strip.text = element_text(size = 14, angle = 0, colour = "Black"),
+          panel.grid.major = element_line(size = 0.5, linetype = 'solid',colour = "#f9f9f9"), 
+          panel.grid.minor = element_blank(),
+          panel.background = element_rect(fill = "white"), 
+          panel.border = element_rect(colour = "black",fill=NA, size=1),
+          legend.key = element_blank(),  ## Get rid of the legend box 
+          legend.title = element_text(size = 14, face="bold"),
+          legend.position = "bottom",
+          legend.text = element_text(size = 14, face="italic"))
+p3
+```
+
+```{r, echo=FALSE}
+ggsave(filename = "autofluorescence-notitle.png",plot = p3,width = 8,height = 6,dpi = 600)
+```

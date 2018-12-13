@@ -1,0 +1,175 @@
+---
+title: "ion leakage NES/NLS"
+author: "Marijn Knip"
+date: "2/7/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list=ls())
+
+##install libraries below, if needed
+## install.packages("ggplot2")
+## install.packages("doBy")
+## install.packages("rstudioapi")
+
+library(ggplot2)
+library(doBy)
+library(plyr)
+library(ggpubr)
+```
+
+Here the ion leakage data is read. It's already in long-format, as it's acquired like that.
+
+```{r}
+iondata <- read.table("data - Figure 4B.csv", ##change to your *.csv
+                     header = T,
+                     sep = ";",
+                     dec = "."
+)
+```
+
+Setting the titlenames and summarizing data
+
+```{r, echo=off}
+##insert plot title, axis titles, legend text etc. here
+plottitle=    ""
+plotsubtitle= ""
+legendtitle=  "Constructs"
+xaxislabel=   "Time after DEX-induction (hrs)"
+yaxislabel=   "Conductivity (\U03BCS/m)"
+legendname1=  "DEX::CP105 + Rx1-GFP"
+legendname2=  "DEX::CP105 + Rx1-NES-GFP"
+legendname3=  "DEX::CP105 + Rx1-NLS-GFP"
+legendname4=  "DEX::CP106 + Rx1-GFP"
+legendname5=  "DEX::CP106 + Rx1-NES-GFP"
+legendname6=  "DEX::CP106 + Rx1-NLS-GFP"
+##legendname works for 4 entries, change code at p1 to change number
+
+
+##summarizing data
+
+data <- summaryBy(Conductivity ~ TimePoint + Construct, data=iondata, FUN=c(length,mean,sd))
+
+
+levels(data$Construct)[levels(data$Construct)=="CP106 + RX-NLS"] <- legendname6
+levels(data$Construct)[levels(data$Construct)=="CP106 + RX-NES"] <- legendname5
+levels(data$Construct)[levels(data$Construct)=="CP106 + RX"]     <- legendname4
+levels(data$Construct)[levels(data$Construct)=="CP105 + RX-NLS"] <- legendname3
+levels(data$Construct)[levels(data$Construct)=="CP105 + RX-NES"] <- legendname2
+levels(data$Construct)[levels(data$Construct)=="CP105 + RX"]     <- legendname1
+
+levels(iondata$Construct)[levels(iondata$Construct)=="CP106 + RX-NLS"] <- legendname6
+levels(iondata$Construct)[levels(iondata$Construct)=="CP106 + RX-NES"] <- legendname5
+levels(iondata$Construct)[levels(iondata$Construct)=="CP106 + RX"]     <- legendname4
+levels(iondata$Construct)[levels(iondata$Construct)=="CP105 + RX-NLS"] <- legendname3
+levels(iondata$Construct)[levels(iondata$Construct)=="CP105 + RX-NES"] <- legendname2
+levels(iondata$Construct)[levels(iondata$Construct)=="CP105 + RX"]     <- legendname1
+
+##reverse levels to map colors from palette appropriately
+#data$Construct = factor(data$Construct, levels=rev(levels(data$Construct)))
+data$TimePoint <- as.factor(data$TimePoint)
+iondata$TimePoint <- as.factor(iondata$TimePoint)
+
+##statistics
+test <- compare_means(Conductivity~Construct,
+                    data=iondata,
+                   method = "wilcox.test",
+                   group.by="TimePoint")
+
+my_comparisons <-list( c("DEX::CP106 + Rx1-GFP", "DEX::CP106 + Rx1-NES-GFP"),
+                       c("DEX::CP106 + Rx1-GFP", "DEX::CP106 + Rx1-NLS-GFP"))
+
+```
+
+
+```{r, echo=FALSE}
+
+##drawing plot > Mean values incl. stdev.
+#line graph with dots, slightly transparent (alpha)
+# set position dodge to move data pounts slightly
+pd <- position_dodge(0.95)
+
+p1 <- ggplot(iondata, aes(x=Construct, y=Conductivity, fill=Construct, color=Construct)) + 
+    facet_wrap(~TimePoint, ncol=5)+
+    geom_boxplot(position=pd)+
+    stat_compare_means(method = "wilcox.test",
+                       label = "p.signif",
+                       hide.ns = TRUE,
+                       comparisons=my_comparisons)+
+    scale_fill_manual(values=alpha(c("#2b83ba",
+                               "#2b7fff",
+                               "#05ff00",
+                               "#d7191c",
+                               "#002968",
+                               "#026500"),0.5))+
+  scale_color_manual(values=c("#2b83ba",
+                               "#2b7fff",
+                               "#05ff00",
+                               "#d7191c",
+                               "#002968",
+                               "#026500"))
+p1
+```
+
+Assigning titels and labels
+
+```{r, echo=FALSE}
+##enhancing plot design
+#setting labels and titles
+p2 <- p1 + labs(
+                color=legendtitle,
+                fill=legendtitle,
+                title=plottitle,
+                subtitle=plotsubtitle
+               )
+p2
+```
+
+Final design of the plot
+
+```{r, echo=FALSE}
+
+#changing Theme
+p3 <- p2 +theme(
+  axis.text.x = element_blank(),
+ # axis.text.x = element_text(size = 10, face="bold",angle = 90),
+  plot.title = element_blank(),
+  plot.subtitle = element_text(hjust = 0.5 , color="black", size=16, face="italic"),
+  axis.title.x = element_blank(),
+  axis.title.y = element_blank(),
+  panel.background = element_rect(fill = "white",
+                                  colour = "white",
+                                  size = 0.5, linetype = "solid"),
+  panel.grid.major = element_line(size = 0.5, linetype = 'solid',
+                                  colour = "#f9f9f9"), 
+  panel.grid.minor = element_blank(),
+  panel.border = element_rect(colour = "black", fill=NA, size=1),
+  text = element_text(size=14, face = "plain"), 
+  legend.key = element_blank(),  ## Get rid of the legend box 
+  legend.title = element_blank(),
+  legend.text = element_blank(),
+  legend.position="bottom",
+  legend.background = element_rect(fill=alpha(0.0001)))+
+guides(fill=guide_legend(nrow=3))  
+  
+p3
+```
+
+
+
+```{r, echo=FALSE}
+# save to file
+ggsave(filename = "Ion-leakagePlot-nesnls-notitleviolin.png",plot = p3,width = 8,height = 6,dpi = 600)
+ggsave(filename = "Ion-leakagePlot-nesnls-notitle.pdf",plot = p3,width = 8,height = 6,dpi = 600)
+##ggsave(filename = "Ion-leakagePlot.pdf",plot = p3,width = 7,height = 5,dpi = 600) ##if you want a PDF
+
+ggsave(filename = "Ion-leakagePlot-nesnls-notitlebox.pdf",
+       plot = p3,
+       device = "pdf",
+       width = 8,
+       height = 6)
+
+
+```

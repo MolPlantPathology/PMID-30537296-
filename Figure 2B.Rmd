@@ -1,0 +1,195 @@
+---
+title: "Boxplot ROSburst Figure 2B"
+author: "Marijn Knip"
+date: "2/8/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+rm(list=ls())
+
+library(ggplot2)
+library(plyr)
+library(dplyr)
+library(tidyr)
+library(multcompView)
+
+##set working directory to location of this .R file and read datafile
+
+widedata <- read.table("data - Figure 2B.csv", ##change to your *.csv
+                      header = T,
+                      sep = ";",
+                      dec = "."
+)
+
+# convert NAs into 0
+widedata[is.na(widedata)] <- 0
+# remove time columns
+widedata$TimePoint <- NULL
+widedata$TimeName <- NULL
+# add up all values from different timepoints per sample
+test  <- aggregate(Sample~Construct+Facet, data=widedata, sum)
+test1  <- aggregate(Sample1~Construct+Facet, data=widedata, sum)
+test2  <- aggregate(Sample2~Construct+Facet, data=widedata, sum)
+test3  <- aggregate(Sample3~Construct+Facet, data=widedata, sum)
+test4  <- aggregate(Sample4~Construct+Facet, data=widedata, sum)
+test5  <- aggregate(Sample5~Construct+Facet, data=widedata, sum)
+test6  <- aggregate(Sample6~Construct+Facet, data=widedata, sum)
+test7  <- aggregate(Sample7~Construct+Facet, data=widedata, sum)
+test8  <- aggregate(Sample8~Construct+Facet, data=widedata, sum)
+test9  <- aggregate(Sample9~Construct+Facet, data=widedata, sum)
+
+
+#combine all cumulative sample values to one dataframe
+new <- rbind.fill(list(test, test1, test2, test3, test4, test5, test6, test7, test8, test9),fill=TRUE)
+
+
+
+#combine all sample columns into one new one and rename columns
+data0 <- cbind.data.frame(Construct=new$Construct, Group=new$Facet, Luminescence = rowSums(new[3:12], na.rm = TRUE))
+#get rid of rows with 0
+data <- data0[!apply(data0[3] == 0, 1, FUN = any, na.rm = TRUE),]
+
+```
+
+
+```{r}
+
+#Statistical analysis
+Model4 <- aov(data=data,Luminescence~Construct)
+tHSD <- TukeyHSD(Model4, ordered = FALSE, conf.level = 0.95)
+## plot(tHSD , las=1 , col="brown" )
+generate_label_df <- function(TUKEY, variable){
+  # Extract labels and factor levels from Tukey post-hoc 
+  Tukey.levels <- tHSD$Construct[,4]
+  Tukey.labels <- data.frame(multcompLetters(Tukey.levels)['Letters'])
+  #I need to put the labels in the same order as in the boxplot :
+  Tukey.labels$treatment=rownames(Tukey.labels)
+  Tukey.labels=Tukey.labels[order(Tukey.labels$treatment) , ]
+  return(Tukey.labels)
+}
+
+model=lm(data$Luminescence~data$Construct) 
+ANOVA=aov(model)
+
+# Tukey test to study each pair of treatment :
+TUKEY <- TukeyHSD(x=ANOVA, 'data$Construct', conf.level=0.95)
+labels <-generate_label_df(TUKEY , "data$Construct")#generate labels using function
+names(labels) <-c('Letters','Construct')#rename columns for merging
+yvalue <-aggregate(.~Construct, data=data, mean)# obtain letter position for y axis using means
+final <-merge(labels,yvalue) #merge dataframes
+
+#"resort" to make Tukey-labels go to correct box in plot
+new_final <- final[with(final, order(Group)), ]
+letterlist <- new_final[,2]
+```
+
+```{r}
+##In this section you can change the titles of the plot, axes, legend
+X_axis        = "Constructs"
+Y_axis        = "Cumulative Luminescence (AU)"
+Plot_title    = ""
+Plot_subtitle = ""
+Legend_title  = "Constructs"
+
+#Setting labels of facets
+label_value <- c( '1'="Transgenic Rx1:4xHA",
+                  '2'="Rx1-GFP",
+                  '3'="Rx1-NES-GFP", 
+                  '4'="Rx1-NLS-GFP")
+
+
+#Changing the names of the different constructs in the data
+
+
+  
+  
+```
+
+
+
+
+
+
+```{r, echo=FALSE}
+
+#Building the plot
+p1 <- ggplot(data, aes(x = Construct , y = Luminescence, fill=reorder(Construct, Group))) +
+  facet_grid(.~Group, labeller = as_labeller(label_value), scales = "free_x")+
+  labs(x = X_axis, y = Y_axis, fill=Legend_title, title=Plot_title, subtitle=Plot_subtitle) +
+   geom_boxplot() +
+  geom_text(data = new_final, aes(x = Construct,
+                              y=-0.15*max(final$Luminescence), 
+                              label = format(letterlist, big.mark=",")), 
+                              color="black",
+                              fontface="bold", 
+                              size=6,
+                              hjust="center")+
+                            
+  scale_fill_manual(values=c("#2b83ba","#d7191c",
+                                "#ffa3f9","#ff00ef","#73006c",
+                                "#a3c7ff","#2b7fff","#002968",
+                                "#b3ffb2","#05ff00","#026500"),
+                    labels=c("Rx1+CP105",
+                             "Rx1+CP106",
+                             "Rx1-GFP",
+                             "Rx1-GFP+CP105",
+                             "Rx1-GFP+CP106",
+                             "Rx1-NES-GFP",
+                             "Rx1-NES-GFP+CP105",
+                             "Rx1-NES-GFP+CP106",
+                             "Rx1-NLS-GFP",
+                             "Rx1-NLS-GFP+CP105",
+                             "Rx1-NLS-GFP+CP106"
+                             ))
+p1
+
+
+```
+
+
+```{r, echo=FALSE}
+
+##NOTE: faceting by facet_grid is performed based on "Group column". 
+##      This column contains values 1-3. Names (text) wouldn't result in correct facetting.
+
+#Enhancing the design
+p2 <- p1 +theme(
+      plot.title = element_text(hjust = 0.5 , color="black", size=24, face="bold"),
+      plot.subtitle = element_text(hjust = 0.5 , color="black", size=16, face="italic"),
+      axis.title.x = element_text(color="black", size=14, face="plain"),
+      axis.title.y = element_text(color="black", size=14, face="plain"),
+      axis.text.x = element_blank(),
+                              #    angle=35, 
+                              #   hjust = 0.9, 
+                              #   vjust= 0.8, 
+                              #   face = "bold", 
+                              #   size = 8
+      panel.background = element_rect(fill = "white",
+                                  colour = "white",
+                                  size = 0.5, linetype = "solid"),
+      panel.grid.major = element_line(size = 0.5, linetype = 'solid',
+                                  colour = "#f9f9f9"), 
+      panel.grid.minor = element_blank(),
+      panel.border = element_rect(colour = "black", fill=NA, size=1),
+      legend.key = element_blank(),  ## Get rid of the legend box 
+      legend.title = element_text(size = 12, face="bold"),
+      legend.text = element_text(size = 10, face="plain"),
+      legend.background = element_blank()
+        )
+p2
+
+```
+
+
+
+```{r, echo=FALSE}
+
+# save to file
+ggsave(filename = "ROSburstBoxTukeyfacetnotitle.png",plot = p2,width = 12,height = 5,dpi = 600)
+##ggsave(filename = "ROSburstBoxTukeyfacet.pdf",plot = p2,width = 7,height = 5,dpi = 600) ##if you want a PDF
+
+
+```

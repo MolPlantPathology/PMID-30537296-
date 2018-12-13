@@ -1,0 +1,125 @@
+---
+title: "Comet Violin plot+scatter"
+author: "Marijn Knip"
+date: "2/7/2018"
+output: html_document
+---
+
+Loading data and packages
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list=ls())
+
+library(ggplot2)
+## library(rstudioapi)
+library(ggsignif)
+library(ggpubr)
+library(doBy)
+
+## setwd(dirname(rstudioapi::getActiveDocumentContext()$path)) not working/necessary for r-markdown
+
+df = read.csv(file.path("data - Figure 3B.csv"),
+              header=T,
+              sep=";",
+              stringsAsFactors=F,
+              dec = ",",
+              colClasses = c("character","character","numeric","character"))
+```
+
+Filtering and formating data.
+Left piece in from earlier statistics, but it's inactivated (Apply Kruskal statistical test on both AN and NN data.)
+Paragraph to set titles and labels.
+Function to extract quartiles and means for plotting.
+
+```{r, echo=FALSE}
+
+#names and titles
+legendname1 = "DEX::CP105"
+legendname2 = "DEX::CP106"
+legendname3 = "DEX::GFP"
+plottitle = ""
+plotsubtitle = ""
+yaxislabel = "% of DNA in comet head"
+xaxislabel = "Time after DEX-induction (hrs)"
+
+#data <- summaryBy(PercentHead ~ TimePoint + Construct+Experiment, data=df, FUN=c(length,mean,sd))
+#write.csv(data, file = "MyData.csv",row.names=FALSE)
+
+```
+
+
+
+```{r, echo=FALSE}
+
+## PLOTTING PART
+## Plot prep and Violin plot
+p1 <- ggplot(df, aes(x=TimePoint, y=PercentHead,fill=Construct))+
+       geom_boxplot(
+              position=position_dodge(width = 0.85),
+              colour = "black",
+              outlier.color = "grey50",
+              outlier.shape="o")+
+      scale_fill_manual(
+                        values=c("#2b83ba","#d7191c","#00ff00"),
+                        labels = c(legendname1,legendname2, legendname3))+
+      facet_grid(. ~ Experiment )+
+       scale_y_continuous(breaks=seq(0, 100, 5))+
+      labs(
+          title =plottitle, 
+          subtitle=plotsubtitle,
+          y=yaxislabel,
+          x=xaxislabel,
+          fill="Constructs")
+p1 
+
+```
+
+```{r, echo=FALSE}
+
+##plotting mean (and quantile) and statistics
+
+#removing GFP from dataframe
+df2 <- subset(df, Construct!="GFP")
+
+## using symnum.arg the level of statistical significance is set to p<=0.01
+
+p2 <- p1 + stat_summary(data = df,
+                        fun.y = mean, 
+                        geom = "point", 
+                        shape = 20,
+                        size = 1, 
+                        color = "black", 
+                        position = position_dodge(0.85)) + 
+          stat_compare_means(
+                        data = df2,   ##I ony want to compare CP105/6, not the GFP control
+                        method="wilcox.test", 
+                        label.y=105,
+                        symnum.args = list(cutpoints = c(0, 0.0001, 0.001, 0.01, 1), symbols = c("***", "**", "*", "ns")),
+                        label.sep = ", ",
+                        label="p.signif"
+                        )
+p2
+```
+
+```{r, echo=FALSE}
+##Setting a theme
+p3 <- p2 +  theme(axis.text = element_text(size = 14, face="plain"),
+          plot.title = element_text(face = "bold", size = 12, angle = 0, colour = "Black", hjust=0.5),
+          plot.subtitle = element_text(face = "italic", size = 14, angle = 0, colour = "Black", hjust=0.5),
+          axis.title = element_text(size = 14, angle = 0, colour = "Black"),
+          strip.text = element_text(size = 14, angle = 0, colour = "Black"),
+          panel.grid.major = element_line(size = 0.5, linetype = 'solid',colour = "#f9f9f9"), 
+          panel.grid.minor = element_blank(),
+          panel.background = element_rect(fill = "white"), 
+          panel.border = element_rect(colour = "black",fill=NA, size=1),
+          legend.key = element_blank(),  ## Get rid of the legend box 
+          legend.title = element_text(size = 14, face="bold"),
+          legend.position = "bottom",
+          legend.text = element_text(size = 14, face="italic"))
+p3
+```
+
+```{r, echo=FALSE}
+ggsave(filename = "COMETboxplot-no title.png",plot = p3,width = 8,height = 6,dpi = 600)
+```

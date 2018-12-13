@@ -1,0 +1,158 @@
+---
+title: "Generic Ion Leakage"
+author: "Marijn Knip"
+date: "23 november 2017"
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+rm(list=ls())
+library(knitr)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Simple Line graph for Ion Leakage experiments
+
+This script generates simple line graphs for data generated in an ion-leakage experiment using leaf discs.
+This script reads *.csv files in long format located in the same folder as the script file.
+In this section different elements in the output figure can be set.
+
+```{r, echo=off}
+## install libraries below, if needed
+## install.packages("ggplot2")
+## install.packages("doBy")
+library(ggplot2)
+library(doBy)
+library(ggpubr)
+library(tidyr)
+
+  iondata <- read.table("data - Figure 3A.csv", ##change to your *.csv
+                     header = T,
+                     sep = ";",
+                     dec = ","
+)
+
+##insert plot title, axis titles, legend text etc. here
+
+plottitle=    "Rx1-induced DNA-damage"
+plotsubtitle= "virulent vs. avirulent coat protein"
+legendtitle=  "Constructs"
+xaxislabel=   "Time after DEX-induction (hrs)"
+yaxislabel=   "Fluorescence ratio (Fluorescein/DAPI)"
+legendname1=  "DEX::CP105"
+legendname2=  "DEX::CP106"
+
+
+##summarizing data
+iondata$Time <-as.factor(iondata$Time)
+iondata$Fluorescence <-as.numeric(iondata$Fluorescence)
+
+data <- summaryBy(Fluorescence ~ Time + Construct, data=iondata, FUN=c(length,mean,sd))
+
+data$Construct <- as.character(data$Construct)
+data$Construct[data$Construct == "CP105"] <- "DEX::CP105"
+data$Construct[data$Construct == "CP106"] <- "DEX::CP106"
+
+data$Construct <- as.factor(data$Construct)
+
+summary(data)
+
+```
+
+## Building the plot
+In the section below is the code to generate the simple plot:
+
+```{r echo=off}
+## drawing plot > Mean values incl. stdev.
+#  line graph with dots, slightly transparent (alpha)
+#  set position dodge to move data pounts slightly
+## Using scale_colour_manual (matching brewer "spectral" colour), as using only two colors brewer with spectral palette doesn't give red/blue 
+pd <- position_dodge(0.02)
+
+p1 <- ggplot(data, aes(x=Time, y=Fluorescence.mean, group=Construct)) + 
+        geom_line(aes(color=Construct))+
+        geom_point(aes(shape=Construct, color=Construct),
+                   size=3, 
+                   alpha = 0.4, 
+                   position = pd)+
+   geom_errorbar(aes(ymin=Fluorescence.mean-Fluorescence.sd,
+                       ymax=Fluorescence.mean+Fluorescence.sd),
+                                  width=0.2, 
+                                  position=pd, 
+                                  alpha = 0.4)+
+   scale_color_manual(values = c("#2b83ba","#d7191c")) 
+p1
+```
+
+
+
+```{r echo=off}
+  
+  
+p2 <- p1+stat_compare_means(data=iondata, aes(x=Time, y=Fluorescence),
+                           method="wilcox",
+                           label = "p.signif",
+                           show.legend=FALSE,
+                           size=6
+                          ## label.y=c(35,40,55,90,145)
+                         )
+                
+        
+plot(p2)
+```
+
+## Plot design
+Now the plot is generated we improve the design:
+
+
+```{r}
+#enhancing plot design
+#setting labels and titles
+p3 <- p2 + labs(x=xaxislabel, 
+                y=yaxislabel,
+                fill=legendtitle
+         #       title=plottitle,
+        #        subtitle=plotsubtitle
+               ) +
+        scale_y_continuous(limits=c(0, 1.2)
+                            )
+               
+#changing Theme
+p4 <- p3 +theme(
+  plot.title = element_text(hjust = 0.5 , color="black", size=14, face="bold"),
+  plot.subtitle = element_text(hjust = 0.5 , color="black", size=14, face="italic"),
+  axis.title.x = element_text(color="black", size=14, face="plain"),
+  axis.title.y = element_text(color="black", size=14, face="plain"),
+  panel.background = element_rect(fill = "white",
+                                  colour = "white",
+                                  size = 0.5, linetype = "solid"),
+  panel.grid.major = element_line(size = 0.5, linetype = 'solid',
+                                  colour = "#f9f9f9"), 
+  panel.grid.minor = element_blank(),
+  panel.border = element_rect(colour = "black", fill=NA, size=1),
+  text = element_text(size=14, face = "plain"), 
+  legend.key = element_blank(),  ## Get rid of the legend box 
+  legend.title = element_text(size = 14, face="bold"),
+  legend.text = element_text(size = 14, face="italic"),
+  legend.position = "bottom",
+  legend.background = element_rect(fill=alpha(0.0001))
+)
+plot(p4)
+```
+
+
+
+
+```{r}
+
+# save to file
+ggsave(filename = "Tunel-combo-notitle.png",plot = p4,width = 8,height = 6,dpi = 900)
+
+##if you want a PDF
+ggsave(filename = "ROSburstBox.pdf",plot = p4,width = 8,height = 4,dpi = 600) 
+
+```
